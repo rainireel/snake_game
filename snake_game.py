@@ -11,6 +11,13 @@ HEIGHT = 600
 GRID_SIZE = 20 # Each snake segment and food item will be this size
 FPS = 10     # Game speed (frames per second)
 
+# Game States
+class GameState:
+    MENU = "menu"
+    PLAYING = "playing"
+    GAME_OVER = "game_over"
+    PAUSED = "paused"
+
 # Colors
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -18,13 +25,18 @@ RED = (255, 0, 0)       # Snake Head
 GREEN = (0, 255, 0)     # Food
 DARK_GREEN = (0, 150, 0) # Snake Body
 BLUE = (0, 0, 255)      # Walls
+GRAY = (128, 128, 128)  # Menu items
+YELLOW = (255, 255, 0)  # Highlighted menu items
 
 # Set up the screen
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Snake Game - Enhanced Collisions")
+pygame.display.set_caption("Snake Game - Enhanced Game States")
 clock = pygame.time.Clock()
 
 # --- Game Variables ---
+
+# Current game state
+current_state = GameState.MENU
 
 # Snake starts with 3 segments
 snake_segments = [
@@ -38,19 +50,39 @@ food_position = {'x': 0, 'y': 0}
 
 # Score
 score = 0
+high_score = 0
 font = pygame.font.Font(None, 36) # Default font, size 36
+large_font = pygame.font.Font(None, 72) # Large font for titles
 
-# Game state
-game_over = False
+# Game over information
 collision_cause = "" # To store what caused game over (wall, self)
 
 # Initial direction of the snake
 current_direction = 'RIGHT'
 direction_buffer = [] # To handle quick successive key presses
 
-# --- Functions for game logic (to be filled in) ---
+# Menu selection
+menu_selection = 0
+game_over_selection = 0
 
-# Ensure this function is exactly as below in your snake_game.py
+# --- Functions for game logic ---
+
+def check_wall_collision():
+    """Check if snake head hits the walls."""
+    head = snake_segments[0]
+    return (head['x'] < GRID_SIZE or 
+            head['x'] >= WIDTH - GRID_SIZE or 
+            head['y'] < GRID_SIZE or 
+            head['y'] >= HEIGHT - GRID_SIZE)
+
+def check_self_collision():
+    """Check if snake head hits its own body."""
+    head = snake_segments[0]
+    for segment in snake_segments[1:]:
+        if head['x'] == segment['x'] and head['y'] == segment['y']:
+            return True
+    return False
+
 def spawn_food():
     """Generates random coordinates for food, ensuring it's on the grid and not on the snake or walls."""
     global food_position
@@ -74,7 +106,7 @@ def spawn_food():
 # Ensure this function is exactly as below in your snake_game.py
 def move_snake():
     """Updates the position of snake segments based on current_direction."""
-    global game_over, collision_cause, score, food_position
+    global current_state, collision_cause, score, food_position, high_score
 
     # Get the head's current position
     head_x = snake_segments[0]['x']
@@ -110,13 +142,17 @@ def move_snake():
     if not food_eaten:
         snake_segments.pop() 
     
-    # --- Placeholder for game over conditions (will be added soon) ---
-    # if check_wall_collision():
-    #     game_over = True
-    #     collision_cause = "wall"
-    # if check_self_collision():
-    #     game_over = True
-    #     collision_cause = "self"
+    # Check for collisions
+    if check_wall_collision():
+        current_state = GameState.GAME_OVER
+        collision_cause = "wall"
+        if score > high_score:
+            high_score = score
+    elif check_self_collision():
+        current_state = GameState.GAME_OVER
+        collision_cause = "self"
+        if score > high_score:
+            high_score = score
 
 def draw_elements():
     """Draws the snake, food, walls, and score on the screen."""
@@ -147,21 +183,69 @@ def draw_elements():
     length_text = font.render(f"Length: {len(snake_segments)}", True, WHITE)
     screen.blit(length_text, (GRID_SIZE, GRID_SIZE + 50))
 
-def show_game_over_screen():
-    """Displays the game over message and final score."""
-    game_over_message = font.render("GAME OVER!", True, RED)
-    cause_message = font.render(f"Cause: {collision_cause} collision", True, WHITE)
-    final_score_message = font.render(f"Final Score: {score}", True, WHITE)
-    restart_message = font.render("Press R to Restart", True, WHITE)
+def show_main_menu():
+    """Displays the main menu with options."""
+    screen.fill(BLACK)
+    
+    # Title
+    title = large_font.render("SNAKE GAME", True, WHITE)
+    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, HEIGHT // 4))
+    
+    # Menu options
+    menu_options = ["Start Game", "Quit"]
+    y_offset = HEIGHT // 2
+    
+    for i, option in enumerate(menu_options):
+        color = YELLOW if i == menu_selection else WHITE
+        text = font.render(option, True, color)
+        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, y_offset + i * 50))
+    
+    # Instructions
+    instructions = [
+        "Use arrow keys to navigate",
+        "Press ENTER to select",
+        "Use arrow keys during game to control snake"
+    ]
+    
+    for i, instruction in enumerate(instructions):
+        text = font.render(instruction, True, GRAY)
+        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT - 100 + i * 25))
 
-    screen.blit(game_over_message, (WIDTH // 2 - game_over_message.get_width() // 2, HEIGHT // 2 - 100))
-    screen.blit(cause_message, (WIDTH // 2 - cause_message.get_width() // 2, HEIGHT // 2 - 50))
-    screen.blit(final_score_message, (WIDTH // 2 - final_score_message.get_width() // 2, HEIGHT // 2))
-    screen.blit(restart_message, (WIDTH // 2 - restart_message.get_width() // 2, HEIGHT // 2 + 50))
+def show_game_over_screen():
+    """Displays the enhanced game over screen with options."""
+    screen.fill(BLACK)
+    
+    # Game Over title
+    game_over_title = large_font.render("GAME OVER!", True, RED)
+    screen.blit(game_over_title, (WIDTH // 2 - game_over_title.get_width() // 2, HEIGHT // 6))
+    
+    # Cause and score information
+    cause_message = font.render(f"Cause: {collision_cause.title()} collision", True, WHITE)
+    screen.blit(cause_message, (WIDTH // 2 - cause_message.get_width() // 2, HEIGHT // 3))
+    
+    final_score_message = font.render(f"Final Score: {score}", True, WHITE)
+    screen.blit(final_score_message, (WIDTH // 2 - final_score_message.get_width() // 2, HEIGHT // 3 + 40))
+    
+    if high_score > 0:
+        high_score_message = font.render(f"High Score: {high_score}", True, YELLOW)
+        screen.blit(high_score_message, (WIDTH // 2 - high_score_message.get_width() // 2, HEIGHT // 3 + 80))
+    
+    # Menu options
+    menu_options = ["Play Again", "Main Menu", "Quit"]
+    y_offset = HEIGHT // 2 + 50
+    
+    for i, option in enumerate(menu_options):
+        color = YELLOW if i == game_over_selection else WHITE
+        text = font.render(option, True, color)
+        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, y_offset + i * 50))
+    
+    # Instructions
+    instruction = font.render("Use UP/DOWN arrows and ENTER to select", True, GRAY)
+    screen.blit(instruction, (WIDTH // 2 - instruction.get_width() // 2, HEIGHT - 50))
 
 def reset_game():
     """Resets all game variables to their initial state."""
-    global snake_segments, food_position, score, game_over, current_direction, collision_cause, direction_buffer
+    global snake_segments, food_position, score, current_direction, collision_cause, direction_buffer, current_state
     snake_segments = [
         {'x': WIDTH // 2, 'y': HEIGHT // 2},
         {'x': WIDTH // 2 - GRID_SIZE, 'y': HEIGHT // 2},
@@ -169,10 +253,47 @@ def reset_game():
     ]
     spawn_food()
     score = 0
-    game_over = False
+    current_state = GameState.PLAYING
     current_direction = 'RIGHT'
     collision_cause = ""
     direction_buffer = []
+
+def start_new_game():
+    """Starts a new game from the menu."""
+    reset_game()
+
+def handle_menu_input(event):
+    """Handles input for the main menu."""
+    global menu_selection, current_state
+    
+    if event.key == pygame.K_UP:
+        menu_selection = (menu_selection - 1) % 2
+    elif event.key == pygame.K_DOWN:
+        menu_selection = (menu_selection + 1) % 2
+    elif event.key == pygame.K_RETURN:
+        if menu_selection == 0:  # Start Game
+            start_new_game()
+        elif menu_selection == 1:  # Quit
+            return False
+    return True
+
+def handle_game_over_input(event):
+    """Handles input for the game over screen."""
+    global game_over_selection, current_state
+    
+    if event.key == pygame.K_UP:
+        game_over_selection = (game_over_selection - 1) % 3
+    elif event.key == pygame.K_DOWN:
+        game_over_selection = (game_over_selection + 1) % 3
+    elif event.key == pygame.K_RETURN:
+        if game_over_selection == 0:  # Play Again
+            start_new_game()
+        elif game_over_selection == 1:  # Main Menu
+            current_state = GameState.MENU
+            game_over_selection = 0
+        elif game_over_selection == 2:  # Quit
+            return False
+    return True
 
 # Initial setup calls
 spawn_food()
@@ -186,12 +307,13 @@ while running:
             running = False
         
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_r and game_over:
-                reset_game()
-            
-            # Prevent adding reverse directions to the buffer
-            # Example: If snake is moving RIGHT, prevent adding LEFT
-            if not game_over: # Only allow direction changes if game is not over
+            # Handle different states
+            if current_state == GameState.MENU:
+                running = handle_menu_input(event)
+            elif current_state == GameState.GAME_OVER:
+                running = handle_game_over_input(event)
+            elif current_state == GameState.PLAYING:
+                # Handle game controls
                 if event.key == pygame.K_UP and current_direction != 'DOWN':
                     direction_buffer.append('UP')
                 elif event.key == pygame.K_DOWN and current_direction != 'UP':
@@ -200,28 +322,23 @@ while running:
                     direction_buffer.append('LEFT')
                 elif event.key == pygame.K_RIGHT and current_direction != 'LEFT':
                     direction_buffer.append('RIGHT')
+                elif event.key == pygame.K_ESCAPE:
+                    current_state = GameState.MENU
 
     # 2. Game Logic Update
-    if not game_over:
+    if current_state == GameState.PLAYING:
         # If there are buffered directions, pop the oldest one
         if direction_buffer:
             current_direction = direction_buffer.pop(0)
 
         move_snake() # This is where the snake's position is updated
-    
-        # --- Placeholder for collision checks (will be added in next steps) ---
-        # if check_wall_collision():
-        #     game_over = True
-        #     collision_cause = "wall"
-        # if check_self_collision():
-        #     game_over = True
-        #     collision_cause = "self"
 
     # 3. Drawing (Rendering)
-    draw_elements() # Draw all game components
-    
-    # If game is over, display the game over screen
-    if game_over:
+    if current_state == GameState.MENU:
+        show_main_menu()
+    elif current_state == GameState.PLAYING:
+        draw_elements() # Draw all game components
+    elif current_state == GameState.GAME_OVER:
         show_game_over_screen()
 
     # Update the full display Surface to the screen
