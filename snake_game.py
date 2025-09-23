@@ -45,14 +45,36 @@ snake_segments = [
     {'x': WIDTH // 2 - (2 * GRID_SIZE), 'y': HEIGHT // 2}, # Body 2
 ]
 
-# Food position (will be updated)
-food_position = {'x': 0, 'y': 0}
+# Food (will be updated with type, color, etc.)
+food = {}
+
+# Food Types
+FOOD_TYPES = {
+    'NORMAL': {'color': GREEN, 'points': 10},
+    'BONUS': {'color': YELLOW, 'points': 25},
+    'SPECIAL': {'color': (138, 43, 226), 'points': 50} # BlueViolet for special
+}
 
 # Score
 score = 0
-high_score = 0
+high_scores = [] # List to store top scores
+HIGH_SCORE_FILE = "high_scores.txt"
 font = pygame.font.Font(None, 36) # Default font, size 36
 large_font = pygame.font.Font(None, 72) # Large font for titles
+
+def load_high_scores():
+    """Loads high scores from a file."""
+    try:
+        with open(HIGH_SCORE_FILE, "r") as f:
+            return sorted([int(line.strip()) for line in f.readlines()], reverse=True)[:5]
+    except FileNotFoundError:
+        return [] # Return empty list if file doesn't exist
+
+def save_high_scores():
+    """Saves the high scores to a file."""
+    with open(HIGH_SCORE_FILE, "w") as f:
+        for score_item in high_scores:
+            f.write(f"{score_item}\n")
 
 # Game over information
 collision_cause = "" # To store what caused game over (wall, self)
@@ -84,29 +106,38 @@ def check_self_collision():
     return False
 
 def spawn_food():
-    """Generates random coordinates for food, ensuring it's on the grid and not on the snake or walls."""
-    global food_position
+    """Generates a new food item with a random type and position."""
+    global food
+
+    # Determine food type (e.g., 80% normal, 15% bonus, 5% special)
+    food_type_name = random.choices(['NORMAL', 'BONUS', 'SPECIAL'], weights=[0.8, 0.15, 0.05], k=1)[0]
+    food_type_info = FOOD_TYPES[food_type_name]
+
     while True:
-        # Food coordinates must be multiples of GRID_SIZE
-        # Ensure food spawns within the playable area (GRID_SIZE to WIDTH/HEIGHT - 2*GRID_SIZE for walls)
         new_x = random.randrange(GRID_SIZE, WIDTH - GRID_SIZE, GRID_SIZE)
         new_y = random.randrange(GRID_SIZE, HEIGHT - GRID_SIZE, GRID_SIZE)
-        
-        food_position = {'x': new_x, 'y': new_y}
         
         # Check if food spawns on the snake
         overlap = False
         for segment in snake_segments:
-            if segment['x'] == food_position['x'] and segment['y'] == food_position['y']:
+            if segment['x'] == new_x and segment['y'] == new_y:
                 overlap = True
                 break
+        
         if not overlap:
+            food = {
+                'x': new_x, 
+                'y': new_y, 
+                'type': food_type_name,
+                'color': food_type_info['color'],
+                'points': food_type_info['points']
+            }
             break # Valid food position found
 
 # Ensure this function is exactly as below in your snake_game.py
 def move_snake():
     """Updates the position of snake segments based on current_direction."""
-    global current_state, collision_cause, score, food_position, high_score
+    global current_state, collision_cause, score, food, high_score
 
     # Get the head's current position
     head_x = snake_segments[0]['x']
@@ -132,27 +163,32 @@ def move_snake():
 
     # Check for food collision (AFTER new head is added, but BEFORE popping tail)
     food_eaten = False
-    if new_head['x'] == food_position['x'] and new_head['y'] == food_position['y']:
-        score += 10
+    if new_head['x'] == food['x'] and new_head['y'] == food['y']:
+        score += food['points'] # Add points based on food type
         spawn_food() # Food eaten, so spawn new food
         food_eaten = True # Mark that food was eaten so snake grows
-        # print(f"Food eaten! Score: {score}, Length: {len(snake_segments)}") # Debug line (optional)
 
     # If food was NOT eaten, remove the last segment (tail) to keep length consistent
     if not food_eaten:
         snake_segments.pop() 
     
     # Check for collisions
+    # --- Collision Checks ---
+    collided = False
     if check_wall_collision():
-        current_state = GameState.GAME_OVER
         collision_cause = "wall"
-        if score > high_score:
-            high_score = score
+        collided = True
     elif check_self_collision():
-        current_state = GameState.GAME_OVER
         collision_cause = "self"
-        if score > high_score:
-            high_score = score
+        collided = True
+
+    if collided:
+        current_state = GameState.GAME_OVER
+        # Update high scores
+        high_scores.append(score)
+        high_scores.sort(reverse=True)
+        high_scores = high_scores[:5] # Keep only top 5
+        save_high_scores()
 
 def draw_elements():
     """Draws the snake, food, walls, and score on the screen."""
@@ -165,7 +201,7 @@ def draw_elements():
     pygame.draw.rect(screen, BLUE, (WIDTH - GRID_SIZE, 0, GRID_SIZE, HEIGHT)) # Right wall
 
     # Draw food
-    pygame.draw.rect(screen, GREEN, (food_position['x'], food_position['y'], GRID_SIZE, GRID_SIZE))
+    pygame.draw.rect(screen, food['color'], (food['x'], food['y'], GRID_SIZE, GRID_SIZE))
 
     # Draw snake segments
     for i, segment in enumerate(snake_segments):
@@ -184,32 +220,35 @@ def draw_elements():
     screen.blit(length_text, (GRID_SIZE, GRID_SIZE + 50))
 
 def show_main_menu():
-    """Displays the main menu with options."""
+    """Displays the main menu with options and high scores."""
     screen.fill(BLACK)
     
     # Title
     title = large_font.render("SNAKE GAME", True, WHITE)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, HEIGHT // 4))
-    
+    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 50))
+
     # Menu options
     menu_options = ["Start Game", "Quit"]
-    y_offset = HEIGHT // 2
-    
+    y_offset = 200
     for i, option in enumerate(menu_options):
         color = YELLOW if i == menu_selection else WHITE
         text = font.render(option, True, color)
         screen.blit(text, (WIDTH // 2 - text.get_width() // 2, y_offset + i * 50))
-    
+
+    # High Scores Display
+    high_score_title = font.render("Top 5 High Scores:", True, YELLOW)
+    screen.blit(high_score_title, (50, 150))
+    if not high_scores:
+        no_scores_text = font.render("No scores yet!", True, WHITE)
+        screen.blit(no_scores_text, (50, 200))
+    else:
+        for i, hs in enumerate(high_scores):
+            hs_text = font.render(f"{i+1}. {hs}", True, WHITE)
+            screen.blit(hs_text, (50, 200 + i * 40))
+
     # Instructions
-    instructions = [
-        "Use arrow keys to navigate",
-        "Press ENTER to select",
-        "Use arrow keys during game to control snake"
-    ]
-    
-    for i, instruction in enumerate(instructions):
-        text = font.render(instruction, True, GRAY)
-        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT - 100 + i * 25))
+    instruction_text = font.render("Use arrow keys to navigate & ENTER to select", True, GRAY)
+    screen.blit(instruction_text, (WIDTH // 2 - instruction_text.get_width() // 2, HEIGHT - 50))
 
 def show_game_over_screen():
     """Displays the enhanced game over screen with options."""
@@ -226,8 +265,8 @@ def show_game_over_screen():
     final_score_message = font.render(f"Final Score: {score}", True, WHITE)
     screen.blit(final_score_message, (WIDTH // 2 - final_score_message.get_width() // 2, HEIGHT // 3 + 40))
     
-    if high_score > 0:
-        high_score_message = font.render(f"High Score: {high_score}", True, YELLOW)
+    if high_scores:
+        high_score_message = font.render(f"High Score: {high_scores[0]}", True, YELLOW)
         screen.blit(high_score_message, (WIDTH // 2 - high_score_message.get_width() // 2, HEIGHT // 3 + 80))
     
     # Menu options
@@ -245,7 +284,7 @@ def show_game_over_screen():
 
 def reset_game():
     """Resets all game variables to their initial state."""
-    global snake_segments, food_position, score, current_direction, collision_cause, direction_buffer, current_state
+    global snake_segments, food, score, current_direction, collision_cause, direction_buffer, current_state
     snake_segments = [
         {'x': WIDTH // 2, 'y': HEIGHT // 2},
         {'x': WIDTH // 2 - GRID_SIZE, 'y': HEIGHT // 2},
@@ -296,6 +335,7 @@ def handle_game_over_input(event):
     return True
 
 # Initial setup calls
+high_scores = load_high_scores()
 spawn_food()
 
 # --- Main Game Loop ---
