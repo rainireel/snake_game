@@ -8,242 +8,204 @@ pygame.init()
 # Game settings
 WIDTH = 800
 HEIGHT = 600
+GRID_SIZE = 20 # Each snake segment and food item will be this size
+FPS = 10     # Game speed (frames per second)
+
+# Colors
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-DARK_GREEN = (0, 200, 0)
-PLAYER_SPEED = 5
-FOOD_SIZE = 20
+RED = (255, 0, 0)       # Snake Head
+GREEN = (0, 255, 0)     # Food
+DARK_GREEN = (0, 150, 0) # Snake Body
+BLUE = (0, 0, 255)      # Walls
 
-# Create screen
+# Set up the screen
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Advanced Snake Game - Complete Collision Detection")
+pygame.display.set_caption("Snake Game - Enhanced Collisions")
 clock = pygame.time.Clock()
 
-# Snake segments
+# --- Game Variables ---
+
+# Snake starts with 3 segments
 snake_segments = [
-    {'x': WIDTH // 2, 'y': HEIGHT // 2, 'size': 20},      # Head
-    {'x': WIDTH // 2 - 20, 'y': HEIGHT // 2, 'size': 20}, # Body segment 1
-    {'x': WIDTH // 2 - 40, 'y': HEIGHT // 2, 'size': 20}, # Body segment 2
+    {'x': WIDTH // 2, 'y': HEIGHT // 2},          # Head
+    {'x': WIDTH // 2 - GRID_SIZE, 'y': HEIGHT // 2}, # Body 1
+    {'x': WIDTH // 2 - (2 * GRID_SIZE), 'y': HEIGHT // 2}, # Body 2
 ]
 
-# Food position
-food_x = random.randint(50, WIDTH - 50)
-food_y = random.randint(50, HEIGHT - 50)
+# Food position (will be updated)
+food_position = {'x': 0, 'y': 0}
+
+# Score
+score = 0
+font = pygame.font.Font(None, 36) # Default font, size 36
 
 # Game state
-score = 0
 game_over = False
-font = pygame.font.Font(None, 36)
+collision_cause = "" # To store what caused game over (wall, self)
 
-# ==================== COLLISION DETECTION FUNCTIONS ====================
+# Initial direction of the snake
+current_direction = 'RIGHT'
+direction_buffer = [] # To handle quick successive key presses
 
-def check_self_collision():
-    """Check if snake head collides with any body segment"""
-    head = snake_segments[0]
-    for segment in snake_segments[1:]:  # Skip head
-        if (head['x'] < segment['x'] + segment['size'] and
-            head['x'] + head['size'] > segment['x'] and
-            head['y'] < segment['y'] + segment['size'] and
-            head['y'] + head['size'] > segment['y']):
-            return True  # Self-collision detected
-    return False
-
-def check_wall_collision():
-    """Check if snake hits the walls"""
-    head = snake_segments[0]
-    return (head['x'] <= 0 or head['x'] >= WIDTH - head['size'] or 
-            head['y'] <= 0 or head['y'] >= HEIGHT - head['size'])
-
-def check_food_collision():
-    """Check if snake head collides with food"""
-    head = snake_segments[0]
-    return (head['x'] < food_x + FOOD_SIZE and
-            head['x'] + head['size'] > food_x and
-            head['y'] < food_y + FOOD_SIZE and
-            head['y'] + head['size'] > food_y)
-
-# ==================== GAME LOGIC FUNCTIONS ====================
-
-def move_snake(direction):
-    """Move the snake in the given direction"""
-    # Move body segments (each follows the previous one)
-    for i in range(len(snake_segments)-1, 0, -1):
-        snake_segments[i]['x'] = snake_segments[i-1]['x']
-        snake_segments[i]['y'] = snake_segments[i-1]['y']
-    
-    # Move head based on direction
-    if direction == 'LEFT':
-        snake_segments[0]['x'] -= PLAYER_SPEED
-    elif direction == 'RIGHT':
-        snake_segments[0]['x'] += PLAYER_SPEED
-    elif direction == 'UP':
-        snake_segments[0]['y'] -= PLAYER_SPEED
-    elif direction == 'DOWN':
-        snake_segments[0]['y'] += PLAYER_SPEED
-
-def add_segment():
-    """Add a new segment to the snake when it eats food"""
-    last_segment = snake_segments[-1]
-    new_segment = {
-        'x': last_segment['x'],
-        'y': last_segment['y'],
-        'size': last_segment['size']
-    }
-    snake_segments.append(new_segment)
+# --- Functions for game logic (to be filled in) ---
 
 def spawn_food():
-    """Spawn food in a random position that doesn't overlap with snake"""
-    global food_x, food_y
+    """Generates random coordinates for food, ensuring it's on the grid and not on the snake."""
+    global food_position
     while True:
-        food_x = random.randint(20, WIDTH - 40)
-        food_y = random.randint(20, HEIGHT - 40)
+        # Food coordinates must be multiples of GRID_SIZE
+        new_x = random.randrange(GRID_SIZE, WIDTH - GRID_SIZE, GRID_SIZE)
+        new_y = random.randrange(GRID_SIZE, HEIGHT - GRID_SIZE, GRID_SIZE)
         
-        # Check if food overlaps with any snake segment
+        food_position = {'x': new_x, 'y': new_y}
+        
+        # Check if food spawns on the snake
         overlap = False
         for segment in snake_segments:
-            if (food_x < segment['x'] + segment['size'] and
-                food_x + FOOD_SIZE > segment['x'] and
-                food_y < segment['y'] + segment['size'] and
-                food_y + FOOD_SIZE > segment['y']):
+            if segment['x'] == food_position['x'] and segment['y'] == food_position['y']:
                 overlap = True
                 break
-        
         if not overlap:
-            break  # Found a valid position
+            break # Valid food position found
 
-def show_game_over(collision_type):
-    """Display game over screen with collision info"""
-    game_over_text = font.render("GAME OVER! Press R to restart", True, RED)
-    final_score = font.render(f"Final Score: {score}", True, WHITE)
-    
-    # Different messages based on collision type
-    if collision_type == "wall":
-        cause_text = font.render("Cause: Hit the wall!", True, WHITE)
-    elif collision_type == "self":
-        cause_text = font.render("Cause: Ate yourself!", True, WHITE)
+def move_snake():
+    """Updates the position of snake segments based on current_direction."""
+    global game_over, collision_cause
+
+    # Get the head's current position
+    head_x = snake_segments[0]['x']
+    head_y = snake_segments[0]['y']
+
+    # Create new head position based on current_direction
+    new_head = {'x': head_x, 'y': head_y}
+    if current_direction == 'UP':
+        new_head['y'] -= GRID_SIZE
+    elif current_direction == 'DOWN':
+        new_head['y'] += GRID_SIZE
+    elif current_direction == 'LEFT':
+        new_head['x'] -= GRID_SIZE
+    elif current_direction == 'RIGHT':
+        new_head['x'] += GRID_SIZE
+
+    # Insert new head at the beginning of the list
+    snake_segments.insert(0, new_head)
+
+    # --- Collision Checks ---
+    # These will be detailed in separate functions, but called here
+
+    # Temporarily remove the tail if no food eaten
+    # If food is eaten, the tail is NOT removed, making the snake grow.
+    # This logic will be added when we implement food collision properly.
+    if new_head['x'] == food_position['x'] and new_head['y'] == food_position['y']:
+        # Food eaten, don't pop tail (snake grows), spawn new food
+        pass # We'll fill this in with actual food logic later
     else:
-        cause_text = font.render("Cause: Unknown", True, WHITE)
+        snake_segments.pop() # Remove the last segment (tail)
     
-    screen.blit(game_over_text, (WIDTH//2 - 180, HEIGHT//2 - 60))
-    screen.blit(final_score, (WIDTH//2 - 100, HEIGHT//2 - 20))
-    screen.blit(cause_text, (WIDTH//2 - 100, HEIGHT//2 + 20))
+    # Placeholder for game over conditions
+    # if check_wall_collision():
+    #     game_over = True
+    #     collision_cause = "wall"
+    # if check_self_collision():
+    #     game_over = True
+    #     collision_cause = "self"
+
+def draw_elements():
+    """Draws the snake, food, walls, and score on the screen."""
+    screen.fill(BLACK) # Clear screen
+
+    # Draw walls (blue rectangles around the edge)
+    pygame.draw.rect(screen, BLUE, (0, 0, WIDTH, GRID_SIZE)) # Top wall
+    pygame.draw.rect(screen, BLUE, (0, HEIGHT - GRID_SIZE, WIDTH, GRID_SIZE)) # Bottom wall
+    pygame.draw.rect(screen, BLUE, (0, 0, GRID_SIZE, HEIGHT)) # Left wall
+    pygame.draw.rect(screen, BLUE, (WIDTH - GRID_SIZE, 0, GRID_SIZE, HEIGHT)) # Right wall
+
+    # Draw food
+    pygame.draw.rect(screen, GREEN, (food_position['x'], food_position['y'], GRID_SIZE, GRID_SIZE))
+
+    # Draw snake segments
+    for i, segment in enumerate(snake_segments):
+        color = RED if i == 0 else DARK_GREEN # Head is red, body is dark green
+        pygame.draw.rect(screen, color, (segment['x'], segment['y'], GRID_SIZE, GRID_SIZE))
+        # Optional: Draw numbers on segments for debugging
+        # segment_num_text = font.render(str(i), True, WHITE)
+        # screen.blit(segment_num_text, (segment['x'] + 2, segment['y'] + 2))
+
+    # Draw score
+    score_text = font.render(f"Score: {score}", True, WHITE)
+    screen.blit(score_text, (GRID_SIZE, GRID_SIZE + 10)) # Adjust position for visibility
+    
+    # Draw length
+    length_text = font.render(f"Length: {len(snake_segments)}", True, WHITE)
+    screen.blit(length_text, (GRID_SIZE, GRID_SIZE + 50))
+
+def show_game_over_screen():
+    """Displays the game over message and final score."""
+    game_over_message = font.render("GAME OVER!", True, RED)
+    cause_message = font.render(f"Cause: {collision_cause} collision", True, WHITE)
+    final_score_message = font.render(f"Final Score: {score}", True, WHITE)
+    restart_message = font.render("Press R to Restart", True, WHITE)
+
+    screen.blit(game_over_message, (WIDTH // 2 - game_over_message.get_width() // 2, HEIGHT // 2 - 100))
+    screen.blit(cause_message, (WIDTH // 2 - cause_message.get_width() // 2, HEIGHT // 2 - 50))
+    screen.blit(final_score_message, (WIDTH // 2 - final_score_message.get_width() // 2, HEIGHT // 2))
+    screen.blit(restart_message, (WIDTH // 2 - restart_message.get_width() // 2, HEIGHT // 2 + 50))
 
 def reset_game():
-    """Reset the game to initial state"""
-    global snake_segments, food_x, food_y, score, game_over
+    """Resets all game variables to their initial state."""
+    global snake_segments, food_position, score, game_over, current_direction, collision_cause, direction_buffer
     snake_segments = [
-        {'x': WIDTH // 2, 'y': HEIGHT // 2, 'size': 20},
-        {'x': WIDTH // 2 - 20, 'y': HEIGHT // 2, 'size': 20},
-        {'x': WIDTH // 2 - 40, 'y': HEIGHT // 2, 'size': 20},
+        {'x': WIDTH // 2, 'y': HEIGHT // 2},
+        {'x': WIDTH // 2 - GRID_SIZE, 'y': HEIGHT // 2},
+        {'x': WIDTH // 2 - (2 * GRID_SIZE), 'y': HEIGHT // 2},
     ]
     spawn_food()
     score = 0
     game_over = False
+    current_direction = 'RIGHT'
+    collision_cause = ""
+    direction_buffer = []
 
-# ==================== MAIN GAME LOOP ====================
-
-# Game variables
-current_direction = 'RIGHT'
-direction_changed = False
-
-# Initial food spawn
+# Initial setup calls
 spawn_food()
 
-# Game loop
+# --- Main Game Loop ---
 running = True
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_r and game_over:
                 reset_game()
-                current_direction = 'RIGHT'
-                direction_changed = False
-    
+            
+            # Store direction changes in a buffer to prevent 180 degree turns
+            if not game_over:
+                if event.key == pygame.K_UP and current_direction != 'DOWN':
+                    direction_buffer.append('UP')
+                elif event.key == pygame.K_DOWN and current_direction != 'UP':
+                    direction_buffer.append('DOWN')
+                elif event.key == pygame.K_LEFT and current_direction != 'RIGHT':
+                    direction_buffer.append('LEFT')
+                elif event.key == pygame.K_RIGHT and current_direction != 'LEFT':
+                    direction_buffer.append('RIGHT')
+
     if not game_over:
-        # Get keyboard input (prevent 180° turns)
-        keys = pygame.key.get_pressed()
-        if not direction_changed:
-            if keys[pygame.K_LEFT] and current_direction != 'RIGHT':
-                current_direction = 'LEFT'
-                direction_changed = True
-            elif keys[pygame.K_RIGHT] and current_direction != 'LEFT':
-                current_direction = 'RIGHT'
-                direction_changed = True
-            elif keys[pygame.K_UP] and current_direction != 'DOWN':
-                current_direction = 'UP'
-                direction_changed = True
-            elif keys[pygame.K_DOWN] and current_direction != 'UP':
-                current_direction = 'DOWN'
-                direction_changed = True
-        
-        # Move snake
-        move_snake(current_direction)
-        direction_changed = False
-        
-        # ===== COLLISION DETECTION =====
-        collision_type = None
-        
-        # Wall collision check
-        if check_wall_collision():
-            game_over = True
-            collision_type = "wall"
-            print("🚧 Wall collision detected!")
-        
-        # Self-collision check (only if not already game over)
-        if not game_over and check_self_collision():
-            game_over = True
-            collision_type = "self"
-            print("💥 Self-collision detected!")
-        
-        # Food collision check
-        if not game_over and check_food_collision():
-            score += 10
-            spawn_food()  # Spawn new food in valid position
-            add_segment()  # Snake grows
-            print("🍎 Food collected! Score:", score)
+        # Process direction buffer for smooth turns
+        if direction_buffer:
+            current_direction = direction_buffer.pop(0)
+
+        move_snake() # This is where the snake moves
     
-    # ===== RENDERING =====
-    # Fill screen
-    screen.fill(BLACK)
+    draw_elements() # Draw everything
     
-    # Draw boundary walls
-    pygame.draw.rect(screen, BLUE, (0, 0, WIDTH, 5))
-    pygame.draw.rect(screen, BLUE, (0, 0, 5, HEIGHT))
-    pygame.draw.rect(screen, BLUE, (WIDTH-5, 0, 5, HEIGHT))
-    pygame.draw.rect(screen, BLUE, (0, HEIGHT-5, WIDTH, 5))
-    
-    # Draw food
-    pygame.draw.rect(screen, GREEN, (food_x, food_y, FOOD_SIZE, FOOD_SIZE))
-    
-    # Draw snake (head is red, body is dark green)
-    for i, segment in enumerate(snake_segments):
-        color = RED if i == 0 else DARK_GREEN
-        pygame.draw.rect(screen, color, (segment['x'], segment['y'], segment['size'], segment['size']))
-    
-    # Draw UI information
-    score_text = font.render(f"Score: {score}", True, WHITE)
-    length_text = font.render(f"Length: {len(snake_segments)}", True, WHITE)
-    
-    screen.blit(score_text, (10, 10))
-    screen.blit(length_text, (10, 50))
-    
-    # Draw collision status
-    collision_status = f"Collisions: Wall({check_wall_collision()}) Self({check_self_collision()})"
-    collision_text = font.render(collision_status, True, WHITE)
-    screen.blit(collision_text, (10, 90))
-    
-    # Show game over screen if applicable
     if game_over:
-        show_game_over(collision_type)
-    
-    # Update screen
-    pygame.display.flip()
-    clock.tick(15)  # Game speed
+        show_game_over_screen()
+
+    pygame.display.flip() # Update the full display Surface to the screen
+    clock.tick(FPS) # Control the game speed
 
 pygame.quit()
 sys.exit()
