@@ -10,10 +10,11 @@ HEIGHT = 600
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
+PLAYER_SPEED = 5
 
 # Create screen
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("My First Python Game!")
+pygame.display.set_caption("My Snake Game - Use Arrow Keys!")
 clock = pygame.time.Clock()
 
 # Player position
@@ -26,6 +27,17 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+    
+    # Get keyboard input
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_LEFT] and player_x > 0:
+        player_x -= PLAYER_SPEED
+    if keys[pygame.K_RIGHT] and player_x < WIDTH - 50:
+        player_x += PLAYER_SPEED
+    if keys[pygame.K_UP] and player_y > 0:
+        player_y -= PLAYER_SPEED
+    if keys[pygame.K_DOWN] and player_y < HEIGHT - 50:
+        player_y += PLAYER_SPEED
     
     # Fill screen
     screen.fill(BLACK)
