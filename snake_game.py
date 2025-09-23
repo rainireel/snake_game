@@ -9,7 +9,14 @@ pygame.init()
 WIDTH = 800
 HEIGHT = 600
 GRID_SIZE = 20 # Each snake segment and food item will be this size
-FPS = 10     # Game speed (frames per second)
+# Difficulty Settings
+DIFFICULTY_LEVELS = {
+    'Easy': 10,
+    'Medium': 15,
+    'Hard': 20
+}
+current_difficulty = 'Easy'
+current_fps = DIFFICULTY_LEVELS[current_difficulty]
 
 # Game States
 class GameState:
@@ -84,7 +91,7 @@ current_direction = 'RIGHT'
 direction_buffer = [] # To handle quick successive key presses
 
 # Menu selection
-menu_selection = 0
+menu_selection = 0 # 0: Start, 1: Difficulty, 2: Quit
 game_over_selection = 0
 
 # --- Functions for game logic ---
@@ -137,7 +144,7 @@ def spawn_food():
 # Ensure this function is exactly as below in your snake_game.py
 def move_snake():
     """Updates the position of snake segments based on current_direction."""
-    global current_state, collision_cause, score, food, high_score
+    global current_state, collision_cause, score, food, high_scores
 
     # Get the head's current position
     head_x = snake_segments[0]['x']
@@ -167,6 +174,11 @@ def move_snake():
         score += food['points'] # Add points based on food type
         spawn_food() # Food eaten, so spawn new food
         food_eaten = True # Mark that food was eaten so snake grows
+
+        # Increase speed every 50 points
+        if score % 50 == 0:
+            global current_fps
+            current_fps = min(current_fps + 2, 30) # Increase FPS by 2, max 30
 
     # If food was NOT eaten, remove the last segment (tail) to keep length consistent
     if not food_eaten:
@@ -200,13 +212,39 @@ def draw_elements():
     pygame.draw.rect(screen, BLUE, (0, 0, GRID_SIZE, HEIGHT)) # Left wall
     pygame.draw.rect(screen, BLUE, (WIDTH - GRID_SIZE, 0, GRID_SIZE, HEIGHT)) # Right wall
 
-    # Draw food
-    pygame.draw.rect(screen, food['color'], (food['x'], food['y'], GRID_SIZE, GRID_SIZE))
+    # Draw food (as an apple)
+    apple_radius = GRID_SIZE // 2
+    apple_center = (food['x'] + apple_radius, food['y'] + apple_radius)
+    pygame.draw.circle(screen, food['color'], apple_center, apple_radius)
+    # Stem
+    stem_rect = pygame.Rect(food['x'] + apple_radius - 2, food['y'] - 5, 4, 5)
+    pygame.draw.rect(screen, (139, 69, 19), stem_rect) # SaddleBrown color
 
     # Draw snake segments
     for i, segment in enumerate(snake_segments):
-        color = RED if i == 0 else DARK_GREEN # Head is red, body is dark green
-        pygame.draw.rect(screen, color, (segment['x'], segment['y'], GRID_SIZE, GRID_SIZE))
+        rect = pygame.Rect(segment['x'], segment['y'], GRID_SIZE, GRID_SIZE)
+        
+        if i == 0: # Head
+            pygame.draw.rect(screen, RED, rect)
+            # Eyes
+            eye_size = 3
+            if current_direction in ['UP', 'DOWN']:
+                eye1 = pygame.Rect(segment['x'] + 3, segment['y'] + 5, eye_size, eye_size)
+                eye2 = pygame.Rect(segment['x'] + GRID_SIZE - 6, segment['y'] + 5, eye_size, eye_size)
+            else: # LEFT or RIGHT
+                eye1 = pygame.Rect(segment['x'] + 5, segment['y'] + 3, eye_size, eye_size)
+                eye2 = pygame.Rect(segment['x'] + 5, segment['y'] + GRID_SIZE - 6, eye_size, eye_size)
+            pygame.draw.rect(screen, BLACK, eye1)
+            pygame.draw.rect(screen, BLACK, eye2)
+
+        elif i == len(snake_segments) - 1: # Tail
+            # Draw a slightly smaller rectangle for a tapered look
+            tail_rect = pygame.Rect(segment['x'] + 2, segment['y'] + 2, GRID_SIZE - 4, GRID_SIZE - 4)
+            pygame.draw.rect(screen, DARK_GREEN, tail_rect)
+        else: # Body
+            # Alternate colors for body segments
+            color = DARK_GREEN if i % 2 == 0 else (0, 200, 0)
+            pygame.draw.rect(screen, color, rect)
         # Optional: Draw numbers on segments for debugging
         # segment_num_text = font.render(str(i), True, WHITE)
         # screen.blit(segment_num_text, (segment['x'] + 2, segment['y'] + 2))
@@ -220,7 +258,7 @@ def draw_elements():
     screen.blit(length_text, (GRID_SIZE, GRID_SIZE + 50))
 
 def show_main_menu():
-    """Displays the main menu with options and high scores."""
+    """Displays the main menu with options, difficulty, and high scores."""
     screen.fill(BLACK)
     
     # Title
@@ -228,7 +266,7 @@ def show_main_menu():
     screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 50))
 
     # Menu options
-    menu_options = ["Start Game", "Quit"]
+    menu_options = ["Start Game", f"Difficulty: {current_difficulty}", "Quit"]
     y_offset = 200
     for i, option in enumerate(menu_options):
         color = YELLOW if i == menu_selection else WHITE
@@ -284,7 +322,7 @@ def show_game_over_screen():
 
 def reset_game():
     """Resets all game variables to their initial state."""
-    global snake_segments, food, score, current_direction, collision_cause, direction_buffer, current_state
+    global snake_segments, food, score, current_direction, collision_cause, direction_buffer, current_state, current_fps
     snake_segments = [
         {'x': WIDTH // 2, 'y': HEIGHT // 2},
         {'x': WIDTH // 2 - GRID_SIZE, 'y': HEIGHT // 2},
@@ -293,6 +331,7 @@ def reset_game():
     spawn_food()
     score = 0
     current_state = GameState.PLAYING
+    current_fps = DIFFICULTY_LEVELS[current_difficulty] # Reset speed to current difficulty
     current_direction = 'RIGHT'
     collision_cause = ""
     direction_buffer = []
@@ -303,16 +342,21 @@ def start_new_game():
 
 def handle_menu_input(event):
     """Handles input for the main menu."""
-    global menu_selection, current_state
+    global menu_selection, current_state, current_difficulty, current_fps
     
     if event.key == pygame.K_UP:
-        menu_selection = (menu_selection - 1) % 2
+        menu_selection = (menu_selection - 1) % 3
     elif event.key == pygame.K_DOWN:
-        menu_selection = (menu_selection + 1) % 2
+        menu_selection = (menu_selection + 1) % 3
     elif event.key == pygame.K_RETURN:
         if menu_selection == 0:  # Start Game
             start_new_game()
-        elif menu_selection == 1:  # Quit
+        elif menu_selection == 1:  # Change Difficulty
+            difficulty_options = list(DIFFICULTY_LEVELS.keys())
+            current_index = difficulty_options.index(current_difficulty)
+            current_difficulty = difficulty_options[(current_index + 1) % len(difficulty_options)]
+            current_fps = DIFFICULTY_LEVELS[current_difficulty]
+        elif menu_selection == 2:  # Quit
             return False
     return True
 
@@ -384,7 +428,7 @@ while running:
     # Update the full display Surface to the screen
     pygame.display.flip() 
     # Control the game speed (FPS)
-    clock.tick(FPS) 
+    clock.tick(current_fps) 
 
 pygame.quit()
 sys.exit()
