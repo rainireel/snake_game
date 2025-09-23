@@ -50,11 +50,13 @@ direction_buffer = [] # To handle quick successive key presses
 
 # --- Functions for game logic (to be filled in) ---
 
+# Ensure this function is exactly as below in your snake_game.py
 def spawn_food():
-    """Generates random coordinates for food, ensuring it's on the grid and not on the snake."""
+    """Generates random coordinates for food, ensuring it's on the grid and not on the snake or walls."""
     global food_position
     while True:
         # Food coordinates must be multiples of GRID_SIZE
+        # Ensure food spawns within the playable area (GRID_SIZE to WIDTH/HEIGHT - 2*GRID_SIZE for walls)
         new_x = random.randrange(GRID_SIZE, WIDTH - GRID_SIZE, GRID_SIZE)
         new_y = random.randrange(GRID_SIZE, HEIGHT - GRID_SIZE, GRID_SIZE)
         
@@ -69,41 +71,46 @@ def spawn_food():
         if not overlap:
             break # Valid food position found
 
+# Ensure this function is exactly as below in your snake_game.py
 def move_snake():
     """Updates the position of snake segments based on current_direction."""
-    global game_over, collision_cause
+    global game_over, collision_cause, score, food_position
 
     # Get the head's current position
     head_x = snake_segments[0]['x']
     head_y = snake_segments[0]['y']
 
-    # Create new head position based on current_direction
-    new_head = {'x': head_x, 'y': head_y}
+    # Calculate new head position based on current_direction
+    new_head_x = head_x
+    new_head_y = head_y
+    
     if current_direction == 'UP':
-        new_head['y'] -= GRID_SIZE
+        new_head_y -= GRID_SIZE
     elif current_direction == 'DOWN':
-        new_head['y'] += GRID_SIZE
+        new_head_y += GRID_SIZE
     elif current_direction == 'LEFT':
-        new_head['x'] -= GRID_SIZE
+        new_head_x -= GRID_SIZE
     elif current_direction == 'RIGHT':
-        new_head['x'] += GRID_SIZE
+        new_head_x += GRID_SIZE
 
-    # Insert new head at the beginning of the list
+    new_head = {'x': new_head_x, 'y': new_head_y}
+
+    # Add the new head to the beginning of the snake
     snake_segments.insert(0, new_head)
 
-    # --- Collision Checks ---
-    # These will be detailed in separate functions, but called here
-
-    # Temporarily remove the tail if no food eaten
-    # If food is eaten, the tail is NOT removed, making the snake grow.
-    # This logic will be added when we implement food collision properly.
+    # Check for food collision (AFTER new head is added, but BEFORE popping tail)
+    food_eaten = False
     if new_head['x'] == food_position['x'] and new_head['y'] == food_position['y']:
-        # Food eaten, don't pop tail (snake grows), spawn new food
-        pass # We'll fill this in with actual food logic later
-    else:
-        snake_segments.pop() # Remove the last segment (tail)
+        score += 10
+        spawn_food() # Food eaten, so spawn new food
+        food_eaten = True # Mark that food was eaten so snake grows
+        # print(f"Food eaten! Score: {score}, Length: {len(snake_segments)}") # Debug line (optional)
+
+    # If food was NOT eaten, remove the last segment (tail) to keep length consistent
+    if not food_eaten:
+        snake_segments.pop() 
     
-    # Placeholder for game over conditions
+    # --- Placeholder for game over conditions (will be added soon) ---
     # if check_wall_collision():
     #     game_over = True
     #     collision_cause = "wall"
@@ -173,6 +180,7 @@ spawn_food()
 # --- Main Game Loop ---
 running = True
 while running:
+    # 1. Event Handling (Input)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -181,8 +189,9 @@ while running:
             if event.key == pygame.K_r and game_over:
                 reset_game()
             
-            # Store direction changes in a buffer to prevent 180 degree turns
-            if not game_over:
+            # Prevent adding reverse directions to the buffer
+            # Example: If snake is moving RIGHT, prevent adding LEFT
+            if not game_over: # Only allow direction changes if game is not over
                 if event.key == pygame.K_UP and current_direction != 'DOWN':
                     direction_buffer.append('UP')
                 elif event.key == pygame.K_DOWN and current_direction != 'UP':
@@ -192,20 +201,33 @@ while running:
                 elif event.key == pygame.K_RIGHT and current_direction != 'LEFT':
                     direction_buffer.append('RIGHT')
 
+    # 2. Game Logic Update
     if not game_over:
-        # Process direction buffer for smooth turns
+        # If there are buffered directions, pop the oldest one
         if direction_buffer:
             current_direction = direction_buffer.pop(0)
 
-        move_snake() # This is where the snake moves
+        move_snake() # This is where the snake's position is updated
     
-    draw_elements() # Draw everything
+        # --- Placeholder for collision checks (will be added in next steps) ---
+        # if check_wall_collision():
+        #     game_over = True
+        #     collision_cause = "wall"
+        # if check_self_collision():
+        #     game_over = True
+        #     collision_cause = "self"
+
+    # 3. Drawing (Rendering)
+    draw_elements() # Draw all game components
     
+    # If game is over, display the game over screen
     if game_over:
         show_game_over_screen()
 
-    pygame.display.flip() # Update the full display Surface to the screen
-    clock.tick(FPS) # Control the game speed
+    # Update the full display Surface to the screen
+    pygame.display.flip() 
+    # Control the game speed (FPS)
+    clock.tick(FPS) 
 
 pygame.quit()
 sys.exit()
