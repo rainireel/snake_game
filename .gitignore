@@ -1,0 +1,34 @@
+# Python cache and bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+env/
+venv/
+.venv/
+
+# Large files (prevents giant Git folders)
+*.mp4
+*.avi
+*.mov
+*.zip
+*.tar.gz
+*.exe
+*.dmg
+*.iso
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build directories
+build/
+dist/
