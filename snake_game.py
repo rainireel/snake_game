@@ -4,6 +4,8 @@ import random
 
 # Initialize Pygame
 pygame.init()
+pygame.mixer.init()
+
 
 # Game settings
 WIDTH = 800
@@ -69,9 +71,19 @@ HIGH_SCORE_FILE = "high_scores.txt"
 font = pygame.font.Font(None, 36) # Default font, size 36
 large_font = pygame.font.Font(None, 72) # Large font for titles
 
-# Load and scale background image
-background_image = pygame.image.load("background.jpg").convert()
-background_image = pygame.transform.scale(background_image, (WIDTH, HEIGHT))
+# --- Sound Effects ---
+chew_sound = pygame.mixer.Sound('assets/sounds/chew.wav')
+death_sound = pygame.mixer.Sound('assets/sounds/death.wav')
+hiss_sound = pygame.mixer.Sound('assets/sounds/hiss.wav')
+
+# --- Background Music ---
+try:
+    pygame.mixer.music.load('assets/sounds/background.mp3')
+    pygame.mixer.music.set_volume(0.5) # Set volume to 50%
+    pygame.mixer.music.play(-1) # Play in a loop
+except pygame.error:
+    print("Background music 'assets/sounds/background.mp3' not found or could not be played.")
+
 
 def load_high_scores():
     """Loads high scores from a file."""
@@ -175,6 +187,7 @@ def move_snake():
     # Check for food collision (AFTER new head is added, but BEFORE popping tail)
     food_eaten = False
     if new_head['x'] == food['x'] and new_head['y'] == food['y']:
+        chew_sound.play()
         score += food['points'] # Add points based on food type
         spawn_food() # Food eaten, so spawn new food
         food_eaten = True # Mark that food was eaten so snake grows
@@ -199,6 +212,7 @@ def move_snake():
         collided = True
 
     if collided:
+        death_sound.play()
         current_state = GameState.GAME_OVER
         # Update high scores
         high_scores.append(score)
@@ -208,7 +222,7 @@ def move_snake():
 
 def draw_elements():
     """Draws the snake, food, walls, and score on the screen."""
-    screen.blit(background_image, (0, 0)) # Draw background
+    screen.fill(BLACK) # Clear screen
 
     # Draw walls (blue rectangles around the edge)
     pygame.draw.rect(screen, BLUE, (0, 0, WIDTH, GRID_SIZE)) # Top wall
@@ -263,7 +277,7 @@ def draw_elements():
 
 def show_main_menu():
     """Displays the main menu with options, difficulty, and high scores."""
-    screen.blit(background_image, (0, 0))
+    screen.fill(BLACK)
     
     # Title
     title = large_font.render("SNAKE GAME", True, WHITE)
@@ -294,7 +308,7 @@ def show_main_menu():
 
 def show_game_over_screen():
     """Displays the enhanced game over screen with options."""
-    screen.blit(background_image, (0, 0))
+    screen.fill(BLACK)
     
     # Game Over title
     game_over_title = large_font.render("GAME OVER!", True, RED)
