@@ -78,11 +78,11 @@ hiss_sound = pygame.mixer.Sound('assets/sounds/hiss.wav')
 
 # --- Background Music ---
 try:
-    pygame.mixer.music.load('assets/sounds/background.mp3')
+    pygame.mixer.music.load('assets/sounds/assets_sound_background.mp3')
     pygame.mixer.music.set_volume(0.5) # Set volume to 50%
     pygame.mixer.music.play(-1) # Play in a loop
 except pygame.error:
-    print("Background music 'assets/sounds/background.mp3' not found or could not be played.")
+    print("Background music 'assets/sounds/assets_sound_background.mp3' not found or could not be played.")
 
 
 def load_high_scores():
