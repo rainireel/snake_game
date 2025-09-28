@@ -79,6 +79,14 @@ except pygame.error:
     background_image = None
     print("Background image 'assets/images/-3.jpg' not found or could not be loaded.")
 
+# --- Food Image ---
+try:
+    food_image = pygame.image.load('assets/images/cat.png')
+    food_image = pygame.transform.scale(food_image, (GRID_SIZE, GRID_SIZE))
+except pygame.error:
+    food_image = None
+    print("Food image 'assets/images/cat.png' not found or could not be loaded.")
+
 # --- Sound Effects ---
 chew_sound = pygame.mixer.Sound('assets/sounds/chew.wav')
 death_sound = pygame.mixer.Sound('assets/sounds/death.wav')
@@ -241,13 +249,14 @@ def draw_elements():
     pygame.draw.rect(screen, BLUE, (0, 0, GRID_SIZE, HEIGHT)) # Left wall
     pygame.draw.rect(screen, BLUE, (WIDTH - GRID_SIZE, 0, GRID_SIZE, HEIGHT)) # Right wall
 
-    # Draw food (as an apple)
-    apple_radius = GRID_SIZE // 2
-    apple_center = (food['x'] + apple_radius, food['y'] + apple_radius)
-    pygame.draw.circle(screen, food['color'], apple_center, apple_radius)
-    # Stem
-    stem_rect = pygame.Rect(food['x'] + apple_radius - 2, food['y'] - 5, 4, 5)
-    pygame.draw.rect(screen, (139, 69, 19), stem_rect) # SaddleBrown color
+    # Draw food (as a cat)
+    if food_image:
+        screen.blit(food_image, (food['x'], food['y']))
+    else:
+        # Fallback to drawing a circle if the image is not loaded
+        apple_radius = GRID_SIZE // 2
+        apple_center = (food['x'] + apple_radius, food['y'] + apple_radius)
+        pygame.draw.circle(screen, food['color'], apple_center, apple_radius)
 
     # Draw snake segments
     for i, segment in enumerate(snake_segments):
