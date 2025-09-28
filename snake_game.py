@@ -68,8 +68,8 @@ FOOD_TYPES = {
 score = 0
 high_scores = [] # List to store top scores
 HIGH_SCORE_FILE = "high_scores.txt"
-font = pygame.font.Font(None, 36) # Default font, size 36
-large_font = pygame.font.Font(None, 72) # Large font for titles
+font = pygame.font.Font('assets/fonts/alagard.ttf', 36) # Default font, size 36
+large_font = pygame.font.Font('assets/fonts/alagard.ttf', 72) # Large font for titles
 
 # --- Sound Effects ---
 chew_sound = pygame.mixer.Sound('assets/sounds/chew.wav')
