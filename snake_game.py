@@ -71,6 +71,14 @@ HIGH_SCORE_FILE = "high_scores.txt"
 font = pygame.font.Font('assets/fonts/alagard.ttf', 36) # Default font, size 36
 large_font = pygame.font.Font('assets/fonts/alagard.ttf', 72) # Large font for titles
 
+# --- Background Image ---
+try:
+    background_image = pygame.image.load('assets/images/-3.jpg')
+    background_image = pygame.transform.scale(background_image, (WIDTH, HEIGHT))
+except pygame.error:
+    background_image = None
+    print("Background image 'assets/images/-3.jpg' not found or could not be loaded.")
+
 # --- Sound Effects ---
 chew_sound = pygame.mixer.Sound('assets/sounds/chew.wav')
 death_sound = pygame.mixer.Sound('assets/sounds/death.wav')
@@ -222,7 +230,10 @@ def move_snake():
 
 def draw_elements():
     """Draws the snake, food, walls, and score on the screen."""
-    screen.fill(BLACK) # Clear screen
+    if background_image:
+        screen.blit(background_image, (0, 0))
+    else:
+        screen.fill(BLACK) # Clear screen
 
     # Draw walls (blue rectangles around the edge)
     pygame.draw.rect(screen, BLUE, (0, 0, WIDTH, GRID_SIZE)) # Top wall
@@ -277,7 +288,10 @@ def draw_elements():
 
 def show_main_menu():
     """Displays the main menu with options, difficulty, and high scores."""
-    screen.fill(BLACK)
+    if background_image:
+        screen.blit(background_image, (0, 0))
+    else:
+        screen.fill(BLACK)
     
     # Title
     title = large_font.render("SNAKE GAME", True, WHITE)
@@ -308,7 +322,10 @@ def show_main_menu():
 
 def show_game_over_screen():
     """Displays the enhanced game over screen with options."""
-    screen.fill(BLACK)
+    if background_image:
+        screen.blit(background_image, (0, 0))
+    else:
+        screen.fill(BLACK)
     
     # Game Over title
     game_over_title = large_font.render("GAME OVER!", True, RED)
